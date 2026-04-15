@@ -8,9 +8,10 @@ Voice-enabled, RAG-powered multi-agent system with Ollama LLM backend.
 |-----------|-------------------------------------------|
 | Backend   | Python · FastAPI · WebSocket              |
 | LLM       | Ollama (llama3.2 / any local model)       |
-| RAG       | ChromaDB · sentence-transformers          |
+| RAG       | **pgvector** · PostgreSQL · sentence-transformers |
 | Voice     | OpenAI Whisper (local) · sounddevice      |
 | Database  | PostgreSQL · SQLAlchemy async             |
+| Auth      | JWT (python-jose) · bcrypt (passlib)      |
 | Frontend  | React · Vite · CSS                        |
 
 ## Prerequisites
@@ -35,6 +36,17 @@ cp .env.example .env
 ollama pull llama3.2
 ollama pull nomic-embed-text
 ```
+
+### 3. Enable pgvector in PostgreSQL
+
+```sql
+-- Run once in your PostgreSQL instance
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+> pgvector is available via `apt install postgresql-16-pgvector` on Ubuntu,
+> or `brew install pgvector` on macOS. On Windows use the
+> [pgvector releases](https://github.com/pgvector/pgvector/releases).
 
 ### 3. Backend
 
@@ -92,6 +104,9 @@ docs/           Drop your PDF/TXT files here
 
 | Method | Path                        | Description              |
 |--------|-----------------------------|--------------------------|
+| POST   | /api/auth/register          | Register new user        |
+| POST   | /api/auth/login             | Login, get JWT token     |
+| GET    | /api/auth/me                | Get current user info    |
 | POST   | /api/chat/                  | Single-turn chat         |
 | WS     | /api/chat/ws/{session_id}   | Streaming chat           |
 | WS     | /api/voice/ws/{session_id}  | Voice input stream       |
@@ -102,3 +117,5 @@ docs/           Drop your PDF/TXT files here
 | POST   | /api/feedback/              | Submit rating            |
 | POST   | /api/feedback/evaluate      | Auto-evaluate response   |
 | GET    | /api/feedback/stats/{id}    | Session quality stats    |
+
+> All endpoints except `/api/auth/register` and `/api/auth/login` require a `Bearer` JWT token.

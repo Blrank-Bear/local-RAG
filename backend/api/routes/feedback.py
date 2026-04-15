@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.database import get_db
 from backend.memory.feedback_store import feedback_store
+from backend.api.deps import get_current_user
+from backend.db.models import User
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
@@ -25,7 +27,11 @@ class EvaluateRequest(BaseModel):
 
 
 @router.post("/")
-async def submit_feedback(req: FeedbackRequest, db: AsyncSession = Depends(get_db)):
+async def submit_feedback(
+    req: FeedbackRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     fb = await feedback_store.save_feedback(
         db, req.session_id, req.message_id, req.rating, req.comment
     )
@@ -33,7 +39,11 @@ async def submit_feedback(req: FeedbackRequest, db: AsyncSession = Depends(get_d
 
 
 @router.post("/evaluate")
-async def evaluate_response(req: EvaluateRequest, db: AsyncSession = Depends(get_db)):
+async def evaluate_response(
+    req: EvaluateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     log = await feedback_store.evaluate_response(
         db, req.session_id, req.query, req.response, req.retrieved_docs
     )
@@ -45,5 +55,9 @@ async def evaluate_response(req: EvaluateRequest, db: AsyncSession = Depends(get
 
 
 @router.get("/stats/{session_id}")
-async def session_stats(session_id: str, db: AsyncSession = Depends(get_db)):
+async def session_stats(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await feedback_store.get_session_stats(db, session_id)

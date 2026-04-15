@@ -4,10 +4,12 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.voice.stt import transcribe_file
+from backend.api.deps import get_current_user
+from backend.db.models import User
 
 router = APIRouter(prefix="/voice", tags=["voice"])
 
@@ -17,7 +19,10 @@ class TranscribeResponse(BaseModel):
 
 
 @router.post("/transcribe", response_model=TranscribeResponse)
-async def transcribe(file: UploadFile = File(...)):
+async def transcribe(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
     """
     Accept a WAV/WebM/OGG audio file, return the transcript.
     The browser records via MediaRecorder and POSTs the blob here.

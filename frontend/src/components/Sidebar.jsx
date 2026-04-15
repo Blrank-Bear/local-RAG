@@ -10,7 +10,7 @@ const NAV = [
 ]
 
 export default function Sidebar() {
-  const { activePanel, setActivePanel, clearMessages, setSessionId } = useStore()
+  const { activePanel, setActivePanel, clearMessages, setSessionId, user, logout } = useStore()
 
   const newSession = () => {
     setSessionId(crypto.randomUUID())
@@ -41,6 +41,23 @@ export default function Sidebar() {
         <button className="sidebar__new-session" onClick={newSession}>
           + New Session
         </button>
+
+        {user && (
+          <div className="sidebar__user">
+            <span className="sidebar__user-avatar">
+              {user.username?.[0]?.toUpperCase() ?? '?'}
+            </span>
+            <span className="sidebar__user-name">{user.username}</span>
+            <button
+              className="sidebar__logout"
+              onClick={logout}
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              ⏻
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   )

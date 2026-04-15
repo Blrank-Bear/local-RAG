@@ -6,6 +6,8 @@ from pydantic import BaseModel
 import json
 
 from backend.core.task_runner import task_runner
+from backend.api.deps import get_current_user
+from backend.db.models import User
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -16,7 +18,10 @@ class TaskRequest(BaseModel):
 
 
 @router.post("/run")
-async def run_task(req: TaskRequest):
+async def run_task(
+    req: TaskRequest,
+    current_user: User = Depends(get_current_user),
+):
     session_id = req.session_id or str(uuid.uuid4())
     result = await task_runner.execute_task(req.query, session_id)
     return result

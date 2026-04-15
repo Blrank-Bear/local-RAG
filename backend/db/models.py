@@ -1,9 +1,10 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, String, Text, Float, Integer, Boolean,
-    DateTime, ForeignKey, JSON, Enum as SAEnum
+    DateTime, ForeignKey, JSON, Enum as SAEnum, Index,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
+from pgvector.sqlalchemy import Vector
 import enum
 import uuid
 
@@ -15,6 +16,8 @@ def gen_uuid() -> str:
 class Base(DeclarativeBase):
     pass
 
+
+# ── Enums ──────────────────────────────────────────────────────────────────────
 
 class SessionStatus(str, enum.Enum):
     active = "active"
@@ -29,14 +32,33 @@ class TaskStatus(str, enum.Enum):
     failed = "failed"
 
 
+# ── Auth ───────────────────────────────────────────────────────────────────────
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    username = Column(String(64), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+
+
+# ── Session / Chat ─────────────────────────────────────────────────────────────
+
 class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(String, primary_key=True, default=gen_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     status = Column(SAEnum(SessionStatus), default=SessionStatus.active)
 
+    user = relationship("User", back_populates="sessions")
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="session", cascade="all, delete-orphan")
     feedbacks = relationship("Feedback", back_populates="session", cascade="all, delete-orphan")
@@ -107,3 +129,33 @@ class EvaluationLog(Base):
     relevance_score = Column(Float, nullable=True)
     faithfulness_score = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ── pgvector RAG store ─────────────────────────────────────────────────────────
+
+EMBEDDING_DIM = 768  # nomic-embed-text output dimension
+
+
+class DocumentChunk(Base):
+    """Stores document chunks with their vector embeddings (replaces ChromaDB)."""
+    __tablename__ = "document_chunks"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    document_id = Column(String, ForeignKey("documents.id", ondelete="CASCADE"), nullable=True)
+    content = Column(Text, nullable=False)
+    source = Column(String, nullable=False)
+    file_type = Column(String, nullable=False)
+    file_hash = Column(String, nullable=True)
+    embedding = Column(Vector(EMBEDDING_DIM), nullable=True)
+    chunk_index = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index(
+            "ix_document_chunks_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )

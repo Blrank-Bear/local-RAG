@@ -9,7 +9,9 @@ from backend.config import settings
 from backend.db.database import get_db
 from backend.db.models import Document
 from backend.rag.ingestion import ingest_file
-from backend.rag.vector_store import add_documents
+from backend.rag.vector_store import add_documents_async
+from backend.api.deps import get_current_user
+from backend.db.models import User
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 async def upload_document(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     suffix = Path(file.filename).suffix.lower()
     if suffix not in (".pdf", ".txt"):
@@ -29,22 +32,29 @@ async def upload_document(
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    chunks = ingest_file(dest)
-    count = add_documents(chunks)
-
+    # Create DB record first so we have the document_id for chunk FK
     doc = Document(
         filename=file.filename,
         file_type=suffix.lstrip("."),
-        chunk_count=count,
+        chunk_count=0,
     )
     db.add(doc)
+    await db.flush()  # get doc.id without committing
+
+    chunks = ingest_file(dest, document_id=doc.id)
+    count = await add_documents_async(chunks, document_id=doc.id)
+
+    doc.chunk_count = count
     await db.flush()
 
     return {"filename": file.filename, "chunks_indexed": count, "document_id": doc.id}
 
 
 @router.get("/")
-async def list_documents(db: AsyncSession = Depends(get_db)):
+async def list_documents(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     from sqlalchemy import select
     result = await db.execute(select(Document).where(Document.is_active == True))
     docs = result.scalars().all()

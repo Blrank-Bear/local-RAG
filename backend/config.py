@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 class Settings(BaseSettings):
-    # Database
+    # Database (also hosts pgvector)
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:password@localhost:5432/agentdb",
         env="DATABASE_URL",
@@ -21,7 +21,6 @@ class Settings(BaseSettings):
 
     # RAG
     docs_dir: Path = Field(default=Path("./docs"), env="DOCS_DIR")
-    chroma_persist_dir: Path = Field(default=Path("./chroma_db"), env="CHROMA_PERSIST_DIR")
     chunk_size: int = Field(default=512, env="CHUNK_SIZE")
     chunk_overlap: int = Field(default=64, env="CHUNK_OVERLAP")
 
@@ -29,6 +28,11 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", env="API_HOST")
     api_port: int = Field(default=8000, env="API_PORT")
     secret_key: str = Field(default="change-me-in-production", env="SECRET_KEY")
+
+    # Auth / JWT
+    jwt_secret_key: str = Field(default="change-me-to-a-long-random-secret", env="JWT_SECRET_KEY")
+    jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM")
+    access_token_expire_minutes: int = Field(default=10080, env="ACCESS_TOKEN_EXPIRE_MINUTES")  # 7 days
 
     class Config:
         env_file = ".env"

@@ -34,7 +34,7 @@ def split_documents(docs: List[Document]) -> List[Document]:
     return splitter.split_documents(docs)
 
 
-def ingest_file(file_path: Path) -> List[Document]:
+def ingest_file(file_path: Path, document_id: str | None = None) -> List[Document]:
     """Load, split and return chunks with metadata."""
     raw = load_documents(file_path)
     chunks = split_documents(raw)
@@ -45,6 +45,7 @@ def ingest_file(file_path: Path) -> List[Document]:
                 "source": file_path.name,
                 "file_type": file_path.suffix.lstrip("."),
                 "file_hash": file_hash,
+                "document_id": document_id,
             }
         )
     return chunks

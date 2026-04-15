@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.orchestrator import orchestrator
 from backend.db.database import get_db
-from backend.db.models import Session, Message
+from backend.db.models import Session, Message, User
+from backend.api.deps import get_current_user
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -26,12 +27,16 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/", response_model=ChatResponse)
-async def chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
+async def chat(
+    req: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     session_id = req.session_id or str(uuid.uuid4())
 
     session = await db.get(Session, session_id)
     if not session:
-        session = Session(id=session_id)
+        session = Session(id=session_id, user_id=current_user.id)
         db.add(session)
         await db.flush()
 
