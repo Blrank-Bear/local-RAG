@@ -1,11 +1,10 @@
 """Feedback storage and quality evaluation."""
-from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.models import Feedback, EvaluationLog, Message
+from backend.db.models import Feedback, EvaluationLog
 from backend.agents.llm_mixin import LLMMixin
 
 EVAL_SYSTEM = """You are a response quality evaluator. Given a user query, retrieved context,
@@ -17,6 +16,23 @@ Return ONLY JSON: {"relevance": 0.0, "faithfulness": 0.0}"""
 
 
 class FeedbackStore(LLMMixin):
+
+    async def get_existing_feedback(
+        self,
+        db: AsyncSession,
+        session_id: str,
+        message_id: str,
+    ) -> Optional[Feedback]:
+        """Return the existing feedback row for this message, or None."""
+        result = await db.execute(
+            select(Feedback).where(
+                Feedback.session_id == session_id,
+                Feedback.message_id == message_id,
+                Feedback.rating.is_not(None),
+            )
+        )
+        return result.scalars().first()
+
     async def save_feedback(
         self,
         db: AsyncSession,
@@ -34,6 +50,27 @@ class FeedbackStore(LLMMixin):
         db.add(fb)
         await db.flush()
         return fb
+
+    async def get_rated_messages(
+        self,
+        db: AsyncSession,
+        session_id: str,
+    ) -> Dict[str, int]:
+        """Return a dict of {message_id: rating} for all rated messages in the session."""
+        result = await db.execute(
+            select(Feedback.message_id, Feedback.rating).where(
+                Feedback.session_id == session_id,
+                Feedback.message_id.is_not(None),
+                Feedback.rating.is_not(None),
+            )
+        )
+        rows = result.all()
+        # If a message was somehow rated twice, keep the first rating
+        seen: Dict[str, int] = {}
+        for message_id, rating in rows:
+            if message_id not in seen:
+                seen[message_id] = rating
+        return seen
 
     async def evaluate_response(
         self,

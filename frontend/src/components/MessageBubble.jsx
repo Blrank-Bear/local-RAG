@@ -6,16 +6,41 @@ import { useStore } from '../store/useStore'
 import './MessageBubble.css'
 
 export default function MessageBubble({ message }) {
-  const [rated, setRated] = useState(false)
   const [showContext, setShowContext] = useState(false)
+  const [hoveredStar, setHoveredStar] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+
   const sessionId = useStore((s) => s.sessionId)
+  const ratedMessages = useStore((s) => s.ratedMessages)
+  const markRated = useStore((s) => s.markRated)
 
   const isUser = message.role === 'user'
+  const existingRating = ratedMessages[message.id] ?? null
+  const isRated = existingRating !== null
 
   const handleRate = async (rating) => {
-    if (rated) return
-    await api.submitFeedback(sessionId, message.id, rating, null)
-    setRated(true)
+    if (isRated || submitting) return
+    setSubmitting(true)
+    try {
+      await api.submitFeedback(sessionId, message.id, rating, null)
+      markRated(message.id, rating)
+    } catch (err) {
+      // 409 = already rated (race condition or duplicate click) — still mark locally
+      if (err?.response?.status === 409) {
+        markRated(message.id, rating)
+      } else {
+        console.error('Rating failed:', err)
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Determine star fill state for display
+  const getStarState = (n) => {
+    if (isRated) return n <= existingRating ? 'filled' : 'empty'
+    if (hoveredStar > 0) return n <= hoveredStar ? 'hovered' : 'empty'
+    return 'empty'
   }
 
   return (
@@ -46,17 +71,29 @@ export default function MessageBubble({ message }) {
               </button>
             )}
 
-            {!rated ? (
-              <div className="bubble__rating">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} className="bubble__star" onClick={() => handleRate(n)}>
-                    ★
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <span className="bubble__rated">Rated ✓</span>
-            )}
+            <div
+              className={`bubble__rating ${isRated ? 'bubble__rating--locked' : ''}`}
+              title={isRated ? `You rated this ${existingRating} out of 5` : 'Rate this response'}
+            >
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  className={`bubble__star bubble__star--${getStarState(n)}`}
+                  onClick={() => handleRate(n)}
+                  onMouseEnter={() => !isRated && setHoveredStar(n)}
+                  onMouseLeave={() => !isRated && setHoveredStar(0)}
+                  disabled={isRated || submitting}
+                  aria-label={isRated ? `Rated ${existingRating} stars` : `Rate ${n} star${n > 1 ? 's' : ''}`}
+                >
+                  ★
+                </button>
+              ))}
+              {isRated && (
+                <span className="bubble__rated-label">
+                  {existingRating}/5
+                </span>
+              )}
+            </div>
           </div>
         )}
 

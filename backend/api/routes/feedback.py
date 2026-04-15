@@ -1,6 +1,6 @@
 """Feedback and evaluation routes."""
-from typing import Optional
-from fastapi import APIRouter, Depends
+from typing import Optional, Dict
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,8 @@ from backend.db.models import User
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
+
+# ── Schemas ────────────────────────────────────────────────────────────────────
 
 class FeedbackRequest(BaseModel):
     session_id: str
@@ -26,16 +28,41 @@ class EvaluateRequest(BaseModel):
     retrieved_docs: list = []
 
 
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+
 @router.post("/")
 async def submit_feedback(
     req: FeedbackRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Block duplicate ratings on the same message
+    if req.message_id and req.rating is not None:
+        existing = await feedback_store.get_existing_feedback(db, req.session_id, req.message_id)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This message has already been rated.",
+            )
+
     fb = await feedback_store.save_feedback(
         db, req.session_id, req.message_id, req.rating, req.comment
     )
     return {"feedback_id": fb.id, "status": "saved"}
+
+
+@router.get("/rated/{session_id}", response_model=Dict[str, int])
+async def get_rated_messages(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns a map of { message_id: rating } for every message
+    in this session that has already been rated.
+    The frontend uses this to restore rated state after a page reload.
+    """
+    return await feedback_store.get_rated_messages(db, session_id)
 
 
 @router.post("/evaluate")

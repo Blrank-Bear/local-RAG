@@ -147,3 +147,137 @@
   color: var(--danger);
   background: rgba(239, 68, 68, 0.1);
 }
+
+/* ── Session list ─────────────────────────────────────────────────────────── */
+.sidebar__sessions {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.sidebar__sessions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 8px;
+}
+
+.sidebar__sessions-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sidebar__new-session-icon {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color var(--transition);
+}
+
+.sidebar__new-session-icon:hover {
+  color: var(--accent);
+}
+
+.sidebar__sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__sessions-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+/* Individual session row */
+.sidebar__session {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 8px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition);
+  border: 1px solid transparent;
+}
+
+.sidebar__session:hover {
+  background: var(--bg-hover);
+}
+
+.sidebar__session--active {
+  background: var(--accent-dim);
+  border-color: rgba(108, 99, 255, 0.2);
+}
+
+.sidebar__session--active:hover {
+  background: var(--accent-dim);
+}
+
+.sidebar__session-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__session-preview {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.sidebar__session--active .sidebar__session-preview {
+  color: var(--accent);
+}
+
+.sidebar__session-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sidebar__session-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity var(--transition), color var(--transition), background var(--transition);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.sidebar__session:hover .sidebar__session-delete {
+  opacity: 1;
+}
+
+.sidebar__session-delete:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.sidebar__session-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}

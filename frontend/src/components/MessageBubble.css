@@ -105,22 +105,57 @@
 
 .bubble__rating {
   display: flex;
+  align-items: center;
   gap: 2px;
 }
+
+.bubble__rating--locked {
+  cursor: default;
+}
+
 .bubble__star {
   background: none;
   border: none;
-  color: var(--text-muted);
   font-size: 16px;
   cursor: pointer;
-  transition: color var(--transition);
+  transition: color var(--transition), transform var(--transition);
   padding: 0 1px;
+  line-height: 1;
 }
-.bubble__star:hover { color: var(--warning); }
 
-.bubble__rated {
+/* Unrated, not hovered */
+.bubble__star--empty {
+  color: var(--text-muted);
+}
+.bubble__star--empty:hover {
+  color: var(--warning);
+  transform: scale(1.15);
+}
+
+/* Hovered preview */
+.bubble__star--hovered {
+  color: var(--warning);
+  transform: scale(1.1);
+}
+
+/* Locked — already rated */
+.bubble__star--filled {
+  color: var(--warning);
+  cursor: default;
+}
+.bubble__star--filled:hover {
+  transform: none;
+}
+
+.bubble__star:disabled {
+  cursor: default;
+}
+
+.bubble__rated-label {
   font-size: 11.5px;
   color: var(--success);
+  margin-left: 4px;
+  font-weight: 500;
 }
 
 /* Context panel */

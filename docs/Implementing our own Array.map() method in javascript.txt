@@ -1,4 +1,0 @@
-Let create our one map method [mymap].
-Step 1.
-We will create new method [mymap] which allows us to use Array.mymap().
-In order use Array.mymap() we have to have mymap() definition in Array.prototype.

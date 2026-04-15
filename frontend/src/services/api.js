@@ -42,6 +42,20 @@ export const api = {
   chat: (query, sessionId) =>
     http.post('/chat/', { query, session_id: sessionId }).then((r) => r.data),
 
+  // History
+  getHistory: (sessionId) =>
+    http.get(`/chat/history/${sessionId}`).then((r) => r.data),
+
+  deleteHistory: (sessionId) =>
+    http.delete(`/chat/history/${sessionId}`),
+
+  // Sessions
+  getSessions: () =>
+    http.get('/chat/sessions').then((r) => r.data),
+
+  deleteSession: (sessionId) =>
+    http.delete(`/chat/sessions/${sessionId}`),
+
   // Voice — POST audio blob, returns { transcript }
   transcribe: (audioBlob) => {
     const form = new FormData()
@@ -65,6 +79,9 @@ export const api = {
   submitFeedback: (sessionId, messageId, rating, comment) =>
     http.post('/feedback/', { session_id: sessionId, message_id: messageId, rating, comment })
       .then((r) => r.data),
+
+  getRatedMessages: (sessionId) =>
+    http.get(`/feedback/rated/${sessionId}`).then((r) => r.data),
 
   getStats: (sessionId) =>
     http.get(`/feedback/stats/${sessionId}`).then((r) => r.data),

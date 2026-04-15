@@ -78,11 +78,7 @@ If context is provided, cite the source. If not relevant, answer from your knowl
         )
         final_response = response.content.strip()
 
-        # Save to memory
-        context["final_response"] = final_response
-        context["memory_action"] = "save"
-        context = await memory_agent.run(context)
-
+        # History is persisted by the chat route — no need to save here.
         await emit("Done", "orchestrator")
 
         return {
