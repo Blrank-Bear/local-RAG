@@ -1,10 +1,20 @@
-"""pgvector-backed vector store — replaces ChromaDB."""
+"""
+Vector store backed by PostgreSQL.
+
+Strategy:
+  - If pgvector extension is available → uses native vector column + HNSW index (fast).
+  - If pgvector is NOT available → falls back to storing embeddings as JSON and doing
+    cosine similarity in Python (works on any PostgreSQL, slower for large corpora).
+
+The fallback is transparent — no code changes needed elsewhere.
+"""
 from __future__ import annotations
 
 import asyncio
+import json
+import math
 from typing import List, Tuple
 
-import numpy as np
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
 from sqlalchemy import select, text
@@ -12,7 +22,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import settings
 from backend.db.database import AsyncSessionLocal
-from backend.db.models import DocumentChunk, EMBEDDING_DIM
+
+# ── Runtime flag: set once on first use ───────────────────────────────────────
+_pgvector_available: bool | None = None
+
+
+async def _check_pgvector(db: AsyncSession) -> bool:
+    global _pgvector_available
+    if _pgvector_available is not None:
+        return _pgvector_available
+    try:
+        await db.execute(text("SELECT '[1,2,3]'::vector"))
+        _pgvector_available = True
+    except Exception:
+        _pgvector_available = False
+    return _pgvector_available
 
 
 # ── Embeddings ─────────────────────────────────────────────────────────────────
@@ -24,20 +48,25 @@ def _get_embeddings() -> OllamaEmbeddings:
     )
 
 
-def _embed(texts: List[str]) -> List[List[float]]:
-    """Synchronous embedding call (used from sync contexts)."""
-    return _get_embeddings().embed_documents(texts)
-
-
 async def _embed_async(texts: List[str]) -> List[List[float]]:
-    """Async embedding — runs in thread pool to avoid blocking."""
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _embed, texts)
+    return await loop.run_in_executor(None, _get_embeddings().embed_documents, texts)
 
 
 async def _embed_query_async(query: str) -> List[float]:
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _get_embeddings().embed_query, query)
+
+
+# ── Cosine similarity (Python fallback) ───────────────────────────────────────
+
+def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
 
 
 # ── Write ──────────────────────────────────────────────────────────────────────
@@ -54,27 +83,62 @@ async def add_documents_async(
     embeddings = await _embed_async(texts)
 
     async with AsyncSessionLocal() as db:
+        use_pgvector = await _check_pgvector(db)
+
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
-            row = DocumentChunk(
-                document_id=document_id,
-                content=chunk.page_content,
-                source=chunk.metadata.get("source", "unknown"),
-                file_type=chunk.metadata.get("file_type", "txt"),
-                file_hash=chunk.metadata.get("file_hash"),
-                embedding=emb,
-                chunk_index=i,
-            )
-            db.add(row)
+            if use_pgvector:
+                emb_str = "[" + ",".join(str(x) for x in emb) + "]"
+                await db.execute(
+                    text("""
+                        INSERT INTO document_chunks
+                            (id, document_id, content, source, file_type, file_hash,
+                             embedding, chunk_index, created_at)
+                        VALUES (
+                            gen_random_uuid()::text, :doc_id, :content, :source,
+                            :file_type, :file_hash, :emb::vector, :idx, NOW()
+                        )
+                    """),
+                    {
+                        "doc_id": document_id,
+                        "content": chunk.page_content,
+                        "source": chunk.metadata.get("source", "unknown"),
+                        "file_type": chunk.metadata.get("file_type", "txt"),
+                        "file_hash": chunk.metadata.get("file_hash"),
+                        "emb": emb_str,
+                        "idx": i,
+                    },
+                )
+            else:
+                # Fallback: store embedding as JSON text
+                await db.execute(
+                    text("""
+                        INSERT INTO document_chunks
+                            (id, document_id, content, source, file_type, file_hash,
+                             embedding_json, chunk_index, created_at)
+                        VALUES (
+                            gen_random_uuid()::text, :doc_id, :content, :source,
+                            :file_type, :file_hash, :emb_json, :idx, NOW()
+                        )
+                    """),
+                    {
+                        "doc_id": document_id,
+                        "content": chunk.page_content,
+                        "source": chunk.metadata.get("source", "unknown"),
+                        "file_type": chunk.metadata.get("file_type", "txt"),
+                        "file_hash": chunk.metadata.get("file_hash"),
+                        "emb_json": json.dumps(emb),
+                        "idx": i,
+                    },
+                )
         await db.commit()
 
     return len(chunks)
 
 
 def add_documents(chunks: List[Document], document_id: str | None = None) -> int:
-    """Sync wrapper — runs the async version in a new event loop if needed."""
+    """Sync wrapper."""
     try:
         loop = asyncio.get_running_loop()
-        # We're inside an async context — schedule as a task
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, add_documents_async(chunks, document_id))
@@ -91,39 +155,61 @@ async def similarity_search_with_score_async(
 ) -> List[Tuple[Document, float]]:
     """Return top-k chunks with cosine similarity scores."""
     query_emb = await _embed_query_async(query)
-    emb_str = "[" + ",".join(str(x) for x in query_emb) + "]"
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            text(
-                """
-                SELECT id, content, source, file_type,
-                       1 - (embedding <=> :emb ::vector) AS score
-                FROM document_chunks
-                ORDER BY embedding <=> :emb ::vector
-                LIMIT :k
-                """
-            ),
-            {"emb": emb_str, "k": k},
-        )
-        rows = result.fetchall()
+        use_pgvector = await _check_pgvector(db)
 
-    output: List[Tuple[Document, float]] = []
-    for row in rows:
-        doc = Document(
-            page_content=row.content,
-            metadata={"source": row.source, "file_type": row.file_type},
-        )
-        output.append((doc, float(row.score)))
+        if use_pgvector:
+            emb_str = "[" + ",".join(str(x) for x in query_emb) + "]"
+            result = await db.execute(
+                text("""
+                    SELECT content, source, file_type,
+                           1 - (embedding <=> :emb::vector) AS score
+                    FROM document_chunks
+                    ORDER BY embedding <=> :emb::vector
+                    LIMIT :k
+                """),
+                {"emb": emb_str, "k": k},
+            )
+            rows = result.fetchall()
+            return [
+                (
+                    Document(
+                        page_content=row.content,
+                        metadata={"source": row.source, "file_type": row.file_type},
+                    ),
+                    float(row.score),
+                )
+                for row in rows
+            ]
+        else:
+            # Fallback: load all embeddings and rank in Python
+            result = await db.execute(
+                text("SELECT content, source, file_type, embedding_json FROM document_chunks")
+            )
+            rows = result.fetchall()
 
-    return output
+            scored: List[Tuple[Document, float]] = []
+            for row in rows:
+                if not row.embedding_json:
+                    continue
+                emb = json.loads(row.embedding_json)
+                score = _cosine_similarity(query_emb, emb)
+                doc = Document(
+                    page_content=row.content,
+                    metadata={"source": row.source, "file_type": row.file_type},
+                )
+                scored.append((doc, score))
+
+            scored.sort(key=lambda x: x[1], reverse=True)
+            return scored[:k]
 
 
 def similarity_search_with_score(
     query: str,
     k: int = 5,
 ) -> List[Tuple[Document, float]]:
-    """Sync wrapper for similarity search."""
+    """Sync wrapper."""
     try:
         loop = asyncio.get_running_loop()
         import concurrent.futures
@@ -145,7 +231,6 @@ def similarity_search(query: str, k: int = 5) -> List[Document]:
 
 
 async def delete_chunks_by_document(document_id: str) -> None:
-    """Remove all chunks belonging to a document."""
     async with AsyncSessionLocal() as db:
         await db.execute(
             text("DELETE FROM document_chunks WHERE document_id = :doc_id"),

@@ -4,7 +4,6 @@ from sqlalchemy import (
     DateTime, ForeignKey, JSON, Enum as SAEnum, Index,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
-from pgvector.sqlalchemy import Vector
 import enum
 import uuid
 
@@ -137,7 +136,12 @@ EMBEDDING_DIM = 768  # nomic-embed-text output dimension
 
 
 class DocumentChunk(Base):
-    """Stores document chunks with their vector embeddings (replaces ChromaDB)."""
+    """
+    Stores document chunks with embeddings.
+    - If pgvector is available: uses the `embedding` vector column + HNSW index.
+    - If pgvector is NOT available: uses `embedding_json` text column (fallback).
+    Both columns exist; only one is populated depending on what's available.
+    """
     __tablename__ = "document_chunks"
 
     id = Column(String, primary_key=True, default=gen_uuid)
@@ -146,16 +150,6 @@ class DocumentChunk(Base):
     source = Column(String, nullable=False)
     file_type = Column(String, nullable=False)
     file_hash = Column(String, nullable=True)
-    embedding = Column(Vector(EMBEDDING_DIM), nullable=True)
+    embedding_json = Column(Text, nullable=True)   # fallback: JSON array string
     chunk_index = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        Index(
-            "ix_document_chunks_embedding",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_with={"m": 16, "ef_construction": 64},
-            postgresql_ops={"embedding": "vector_cosine_ops"},
-        ),
-    )

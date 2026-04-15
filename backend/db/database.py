@@ -18,9 +18,16 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def init_db() -> None:
+    # Try to enable pgvector in a separate connection/transaction so a failure
+    # doesn't abort the table-creation that follows.
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            await conn.commit()
+    except Exception:
+        pass  # pgvector not installed; the app will use the JSON fallback
+
     async with engine.begin() as conn:
-        # Enable pgvector extension before creating tables
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
 
 
