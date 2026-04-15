@@ -3,6 +3,7 @@
 #launch.json folder
 .vscode/
 .venv/
+docs/
 frontend/node_modules/
 #Cache folder
 .alcache/

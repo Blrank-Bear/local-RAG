@@ -18,7 +18,6 @@ from typing import List, Tuple
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
 from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import settings
 from backend.db.database import AsyncSessionLocal
@@ -27,15 +26,25 @@ from backend.db.database import AsyncSessionLocal
 _pgvector_available: bool | None = None
 
 
-async def _check_pgvector(db: AsyncSession) -> bool:
+async def _check_pgvector() -> bool:
+    """
+    Test whether the pgvector extension is available.
+    Uses its own isolated engine connection so a failure never
+    aborts the session that will be used for actual inserts.
+    Cached after the first call.
+    """
     global _pgvector_available
     if _pgvector_available is not None:
         return _pgvector_available
+
+    from backend.db.database import engine
     try:
-        await db.execute(text("SELECT '[1,2,3]'::vector"))
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT '[1,2,3]'::vector"))
         _pgvector_available = True
     except Exception:
         _pgvector_available = False
+
     return _pgvector_available
 
 
@@ -82,9 +91,9 @@ async def add_documents_async(
     texts = [c.page_content for c in chunks]
     embeddings = await _embed_async(texts)
 
-    async with AsyncSessionLocal() as db:
-        use_pgvector = await _check_pgvector(db)
+    use_pgvector = await _check_pgvector()
 
+    async with AsyncSessionLocal() as db:
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
             if use_pgvector:
                 emb_str = "[" + ",".join(str(x) for x in emb) + "]"
@@ -155,10 +164,9 @@ async def similarity_search_with_score_async(
 ) -> List[Tuple[Document, float]]:
     """Return top-k chunks with cosine similarity scores."""
     query_emb = await _embed_query_async(query)
+    use_pgvector = await _check_pgvector()
 
     async with AsyncSessionLocal() as db:
-        use_pgvector = await _check_pgvector(db)
-
         if use_pgvector:
             emb_str = "[" + ",".join(str(x) for x in query_emb) + "]"
             result = await db.execute(

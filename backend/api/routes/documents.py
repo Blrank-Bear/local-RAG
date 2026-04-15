@@ -32,20 +32,29 @@ async def upload_document(
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # Create DB record first so we have the document_id for chunk FK
+    # Create and COMMIT the Document row first so the FK in document_chunks resolves.
+    # add_documents_async opens its own session, so the parent row must be visible.
     doc = Document(
         filename=file.filename,
         file_type=suffix.lstrip("."),
         chunk_count=0,
     )
     db.add(doc)
-    await db.flush()  # get doc.id without committing
+    await db.commit()   # ← commit here so add_documents_async can see doc.id
 
-    chunks = ingest_file(dest, document_id=doc.id)
-    count = await add_documents_async(chunks, document_id=doc.id)
+    try:
+        chunks = ingest_file(dest, document_id=doc.id)
+        count = await add_documents_async(chunks, document_id=doc.id)
+    except Exception as e:
+        # Roll back the document record if chunk ingestion fails
+        await db.delete(doc)
+        await db.commit()
+        raise HTTPException(500, f"Ingestion failed: {e}")
 
+    # Update chunk count
     doc.chunk_count = count
-    await db.flush()
+    db.add(doc)
+    await db.commit()
 
     return {"filename": file.filename, "chunks_indexed": count, "document_id": doc.id}
 
