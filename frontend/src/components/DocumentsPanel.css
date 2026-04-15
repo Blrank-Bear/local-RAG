@@ -1,0 +1,120 @@
+.docs-panel {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.docs-panel__header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.docs-panel__header p {
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.docs-panel__dropzone {
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+}
+
+.docs-panel__dropzone:hover,
+.docs-panel__dropzone--over {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.docs-panel__drop-icon { font-size: 36px; }
+
+.docs-panel__uploading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--accent);
+}
+
+.docs-panel__spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--accent-dim);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+.docs-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.docs-panel__empty {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.docs-panel__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition);
+}
+
+.docs-panel__item:hover { border-color: var(--border-light); }
+
+.docs-panel__item-icon { font-size: 20px; }
+
+.docs-panel__item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.docs-panel__item-name {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.docs-panel__item-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.docs-panel__item-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-xl);
+  background: var(--accent-dim);
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

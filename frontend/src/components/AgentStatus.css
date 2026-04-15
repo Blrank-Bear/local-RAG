@@ -1,0 +1,37 @@
+.agent-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  font-size: 12px;
+  animation: fadeIn 0.2s ease;
+}
+
+.agent-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.agent-status__agent {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.agent-status__text {
+  color: var(--text-secondary);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,112 @@
+.feedback-panel {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.feedback-panel__header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.feedback-panel__header p {
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.feedback-panel__refresh {
+  align-self: flex-start;
+  padding: 7px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.feedback-panel__refresh:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.feedback-panel__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.feedback-panel__card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feedback-panel__card-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.feedback-panel__card-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feedback-panel__stars {
+  display: flex;
+  gap: 2px;
+}
+
+.feedback-panel__star {
+  font-size: 22px;
+  color: var(--border-light);
+}
+
+.feedback-panel__star.filled { color: var(--warning); }
+.feedback-panel__star.half   { color: var(--warning); opacity: 0.5; }
+
+.feedback-panel__rating-num {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.feedback-panel__bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.feedback-panel__bar {
+  height: 8px;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.5s ease;
+  min-width: 4px;
+  max-width: 120px;
+}
+
+.feedback-panel__empty {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  text-align: center;
+  padding: 40px 0;
+}
